@@ -3,4 +3,4 @@ project(FileProcessingProject3 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(File_Processing_Project3 main.c)
+add_executable(File_Processing_Project3 main.c ftlmgr.c fdevicedriver.c)

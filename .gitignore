@@ -1,5 +1,9 @@
 ### Cmake build files ###
 /cmake-build-debug/
+/build/
 
 ### Idea files ###
 .idea
+
+### Vscode ###
+.vscode
