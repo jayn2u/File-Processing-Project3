@@ -1,55 +1,62 @@
-name: 파일처리 과제 3 CI Pipeline
+name: 파일처리 과제 3 CI 테스트 스크립트
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - '**.c'
+      - '**.h'
+      - '.github/workflows/test.yml'
   pull_request:
-    branches: [ main ]
 
 jobs:
-  build:
-    container:
-      image: ubuntu:22.01
-    runs-on: ubuntu-latest
+  test-ftl_open:
+    name: ftl_open() test
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Repository
+      - name: 저장소 체크아웃
         uses: actions/checkout@v3
-      - name: Install gcc
-        run: |
-          apt-get update
-          apt-get install -y software-properties-common
-          add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          apt-get update
-          apt-get install -y gcc-13 g++-13
-          update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
-          update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
-          gcc --version
-      - name: Build Application
-        run: |
-          gcc -o app main.c ftlmgr.c fdevicedriver.c
-      - name: Upload Binary Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: app-binary
-          path: app
 
-  test:
-    needs: build
-    strategy:
-      matrix:
-        job: [ 'TestJob1', 'TestJob2', 'TestJob3' ]
-    container:
-      image: ubuntu:22.01
-    runs-on: ubuntu-latest
+      - name: TEST_FTL_OPEN 플래그로 컴파일
+        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+
+      - name: ftl_open 테스트 실행
+        run: ./a.out
+
+  test-ftl_write:
+    name: ftl_write() test
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Repository
+      - name: 저장소 체크아웃
         uses: actions/checkout@v3
-      - name: Download Binary Artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: app-binary
-      - name: Run Test ${{ matrix.job }}
-        run: |
-          chmod +x app
-          # 실행 인자에 따라 구분된 테스트를 수행하도록 구현 (예: --test-type 인자 활용)
-          ./app --test-type "${{ matrix.job }}"
+
+      - name: TEST_FTL_WRITE 플래그로 컴파일
+        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+
+      - name: ftl_write 테스트 실행
+        run: ./a.out
+
+  test-ftl_read:
+    name: ftl_read() test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v3
+
+      - name: TEST_FTL_READ 플래그로 컴파일
+        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+
+      - name: ftl_read 테스트 실행
+        run: ./a.out
+
+  test-ftl_print:
+    name: ftl_print() test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v3
+
+      - name: TEST_FTL_PRINT 플래그로 컴파일
+        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+
+      - name: ftl_print 테스트 실행
+        run: ./a.out
