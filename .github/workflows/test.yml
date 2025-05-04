@@ -2,61 +2,78 @@ name: 파일처리 과제 3 CI 테스트 스크립트
 
 on:
   push:
+    branches:
+      - develop
     paths:
       - '**.c'
       - '**.h'
       - '.github/workflows/test.yml'
   pull_request:
+    branches:
+      - main
 
 jobs:
-  test-ftl_open:
-    name: ftl_open() test
+  build_and_test_open:
+    name: FTL Open 함수 테스트
     runs-on: ubuntu-22.04
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v3
 
-      - name: TEST_FTL_OPEN 플래그로 컴파일
-        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+      - name: ftl_open 테스트 컴파일
+        run: gcc tests/test_ftl_open.c ftlmgr.c fdevicedriver.c -o test_ftl_open -Wall -Wextra -std=c11
 
       - name: ftl_open 테스트 실행
-        run: ./a.out
-
-  test-ftl_write:
-    name: ftl_write() test
+        run: ./test_ftl_open
+  
+  build_and_test_write:
+    name: FTL Write 함수 테스트
     runs-on: ubuntu-22.04
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v3
 
-      - name: TEST_FTL_WRITE 플래그로 컴파일
-        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+      - name: ftl_write 테스트 컴파일
+        run: gcc tests/test_ftl_write.c ftlmgr.c fdevicedriver.c -o test_ftl_write -Wall -Wextra -std=c11
 
       - name: ftl_write 테스트 실행
-        run: ./a.out
-
-  test-ftl_read:
-    name: ftl_read() test
+        run: ./test_ftl_write
+  
+  build_and_test_read:
+    name: FTL Read 함수 테스트
     runs-on: ubuntu-22.04
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v3
 
-      - name: TEST_FTL_READ 플래그로 컴파일
-        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
+      - name: ftl_read 테스트 컴파일
+        run: gcc tests/test_ftl_read.c ftlmgr.c fdevicedriver.c -o test_ftl_read -Wall -Wextra -std=c11
 
       - name: ftl_read 테스트 실행
-        run: ./a.out
-
-  test-ftl_print:
-    name: ftl_print() test
+        run: ./test_ftl_read
+  
+  full_test:
+    name: 전체 테스트 종합
     runs-on: ubuntu-22.04
+    needs: [ build_and_test_open, build_and_test_write, build_and_test_read ]
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v3
 
-      - name: TEST_FTL_PRINT 플래그로 컴파일
-        run: gcc main.c ftlmgr.c fdevicedriver.c -o a.out
-
-      - name: ftl_print 테스트 실행
-        run: ./a.out
+      - name: 모든 테스트 실행
+        run: |
+          set -e
+          gcc tests/test_ftl_open.c ftlmgr.c fdevicedriver.c -o test_ftl_open -Wall -Wextra -std=c11
+          gcc tests/test_ftl_write.c ftlmgr.c fdevicedriver.c -o test_ftl_write -Wall -Wextra -std=c11
+          gcc tests/test_ftl_read.c ftlmgr.c fdevicedriver.c -o test_ftl_read -Wall -Wextra -std=c11
+          
+          echo "===== FTL Open 테스트 실행 ====="
+          ./test_ftl_open
+          
+          echo "===== FTL Write 테스트 실행 ====="
+          ./test_ftl_write
+          
+          echo "===== FTL Read 테스트 실행 ====="
+          ./test_ftl_read
+          
+          echo "모든 테스트가 성공적으로 완료되었습니다."

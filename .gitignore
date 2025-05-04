@@ -1,5 +1,6 @@
 ### Cmake build files ###
 /cmake-build-debug/
+/cmake-build-fileprocess/
 /build/
 
 ### Idea files ###
@@ -7,3 +8,6 @@
 
 ### Vscode ###
 .vscode
+
+### copilot instructions ###
+/.github/copilot-instructions.md
