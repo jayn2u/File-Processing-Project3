@@ -89,9 +89,59 @@ int main() {
     }
   }
 
+  // LSN 2에 대한 3번의 업데이트 테스트 추가
+  printf("\n2. LSN 2에 대한 3번 업데이트 테스트\n");
+
+  int test_lsn2 = 2;  // 두 번째 테스트에 사용할 LSN
+
+  // LSN 2에 3번 업데이트 수행
+  for (int i = 0; i < 3; i++) {
+    memset(sectorbuf, 'X' + i,
+           SECTOR_SIZE);  // 각 업데이트마다 다른 문자로 채움
+    snprintf(sectorbuf, SECTOR_SIZE, "LSN %d 업데이트 #%d", test_lsn2, i);
+
+    printf("\n[업데이트 #%d] LSN %d에 데이터 쓰기: %s\n", i, test_lsn2,
+           sectorbuf);
+    ftl_write(test_lsn2, sectorbuf);
+
+    // 매핑 테이블 및 프리 블록 상태 출력
+    printf("매핑 테이블 출력 (LSN %d 업데이트 #%d 후):\n", test_lsn2, i);
+    ftl_print();
+
+    printf("\n프리 블록 리스트 출력 (LSN %d 업데이트 #%d 후):\n", test_lsn2, i);
+    ftl_print_free_blocks();
+
+    // 데이터 읽기 및 검증
+    memset(readbuf, 0, SECTOR_SIZE);
+    ftl_read(test_lsn2, readbuf);
+    printf("LSN %d에서 데이터 읽기: %s\n", test_lsn2, readbuf);
+
+    if (strncmp(sectorbuf, readbuf, SECTOR_SIZE) != 0) {
+      printf(
+          "오류: 업데이트 #%d 후 LSN %d의 쓰기와 읽기 결과가 일치하지 "
+          "않습니다!\n",
+          i, test_lsn2);
+    } else {
+      printf("업데이트 #%d 후 LSN %d 읽기 검증 성공\n", i, test_lsn2);
+    }
+  }
+
+  // 두 LSN에 대한 최종 결과 검증
+  printf("\n3. 최종 데이터 검증\n");
+
+  // LSN 1 최종 데이터 검증
+  memset(readbuf, 0, SECTOR_SIZE);
+  ftl_read(test_lsn, readbuf);
+  printf("최종 LSN %d 데이터: %s\n", test_lsn, readbuf);
+
+  // LSN 2 최종 데이터 검증
+  memset(readbuf, 0, SECTOR_SIZE);
+  ftl_read(test_lsn2, readbuf);
+  printf("최종 LSN %d 데이터: %s\n", test_lsn2, readbuf);
+
   // 플래시 메모리 파일 닫기
   fclose(flashmemoryfp);
 
-  printf("\n===== FTL 동일한 LSN에 6번 업데이트 테스트 완료 =====\n");
+  printf("\n===== FTL 동일한 LSN 테스트 완료 =====\n");
   return 0;
 }

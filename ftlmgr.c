@@ -134,7 +134,8 @@ void prepare_page_buffer(char* pagebuf, char* sectorbuf, int lsn) {
   memset(pagebuf, 0xFF, PAGE_SIZE);
   // 섹터 데이터 복사
   memcpy(pagebuf, sectorbuf, SECTOR_SIZE);
-  // Spare 영역에 LSN 정보 저장 (바이너리 형태로)
+  // Spare 영역 맨 왼쪽에 LSN 정보 저장 (4B 크기, 바이너리 형태로)
+  // 이 정보를 통해 페이지가 사용 중인지 여부를 판별할 수 있음
   memcpy(pagebuf + SECTOR_SIZE, &lsn, sizeof(int));
 }
 
@@ -415,6 +416,8 @@ void ftl_read(int lsn, char* sectorbuf) {
 
   if (lsn < 0 || lsn >= DATAPAGES_PER_DEVICE) {
     printf("Invalid LSN: %d\n", lsn);
+    memset(sectorbuf, 0xFF,
+           SECTOR_SIZE);  // 유효하지 않은 LSN은 0xFF로 초기화된 값 반환
     return;
   }
 
@@ -453,6 +456,16 @@ void ftl_read(int lsn, char* sectorbuf) {
   if (fdd_read(ppn, pagebuf) < 0) {
     printf("Read operation failed for PPN: %d\n", ppn);
     return;
+  }
+
+  // 스페어 영역에서 LSN 정보 확인하여 페이지 유효성 검증
+  int stored_lsn;
+  memcpy(&stored_lsn, pagebuf + SECTOR_SIZE, sizeof(int));
+
+  // 저장된 LSN과 요청된 LSN이 다른 경우 (데이터 불일치)
+  if (stored_lsn != lsn) {
+    printf("Warning: Stored LSN (%d) does not match requested LSN (%d)\n",
+           stored_lsn, lsn);
   }
 
   // pagebuf에서 섹터 데이터만 sectorbuf로 복사
