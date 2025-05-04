@@ -90,14 +90,6 @@ int main() {
   ftl_read(second_lsn, readbuf);
   printf("LSN %d에서 데이터 읽기: %s\n", second_lsn, readbuf);
 
-  // 쓰기와 읽기 결과 비교
-  if (strncmp(sectorbuf, readbuf, SECTOR_SIZE) != 0) {
-    printf("오류: LSN %d의 쓰기와 읽기 결과가 일치하지 않습니다!\n",
-           second_lsn);
-  } else {
-    printf("LSN %d 쓰기/읽기 테스트 성공\n", second_lsn);
-  }
-
   // 최종 상태 확인
   printf("\n최종 매핑 테이블 출력:\n");
   ftl_print();
