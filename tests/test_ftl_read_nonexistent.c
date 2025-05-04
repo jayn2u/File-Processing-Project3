@@ -63,7 +63,7 @@ int main() {
 
   // 존재하지 않는 LSN 읽기 테스트
   printf("\n2. 존재하지 않는 LSN 읽기 테스트\n");
-  int non_existent_lsn = 100;       // 아직 데이터를 쓰지 않은 LSN
+  int non_existent_lsn = 10;        // 아직 데이터를 쓰지 않은 LSN
   memset(readbuf, 0, SECTOR_SIZE);  // 읽기 버퍼 초기화
   ftl_read(non_existent_lsn, readbuf);
   printf("존재하지 않는 LSN %d 읽기 결과: ", non_existent_lsn);
