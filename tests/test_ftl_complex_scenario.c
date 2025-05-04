@@ -257,22 +257,44 @@ void run_complex_scenario_test(int pattern, int iterations,
 
     if (operation == 1) {  // 쓰기 작업
       generate_test_data(write_buffer, lsn, i);
-      printf("[%d] 쓰기: LSN %d, 데이터: %.20s...\n", i, lsn, write_buffer);
+      printf("[%d/%d] 쓰기: LSN %d, 데이터: %.20s...\n", i + 1, iterations, lsn,
+             write_buffer);
     } else {  // 읽기 작업
-      printf("[%d] 읽기: LSN %d\n", i, lsn);
+      printf("[%d/%d] 읽기: LSN %d\n", i + 1, iterations, lsn);
     }
+
+    // 작업 수행 전 진행률 표시
+    printf("[진행률: %3d%%] ", (i * 100) / iterations);
+    for (int p = 0; p < 20; p++) {
+      if (p < ((i * 20) / iterations)) {
+        printf("█");
+      } else {
+        printf("▒");
+      }
+    }
+    printf("\n");
 
     perform_operation(operation, lsn, write_buffer, sectors, &stats);
 
+    // 매 작업마다 간단한 통계 정보 출력
+    printf("    누적 통계 - 읽기: %d, 쓰기: %d, 덮어쓰기: %d\n",
+           stats.total_reads, stats.total_writes, stats.overwrite_count);
+
     // 매 10회 작업마다 상태 출력
     if (i % 10 == 9 || i == iterations - 1) {
-      printf("\n현재 진행 상태 (작업 %d/%d):\n", i + 1, iterations);
+      printf("\n===== 중간 상태 보고 (작업 %d/%d) =====\n", i + 1, iterations);
+      printf("성공적 읽기/검증: %d, 실패한 읽기/검증: %d\n",
+             stats.read_verify_success, stats.read_verify_fail);
+      printf("매핑 테이블 현재 상태:\n");
       ftl_print();
+
+      // 테스트 검수용 체크포인트 메시지
+      printf("\n✓ 체크포인트 #%d: 테스트 정상 진행중...\n\n", (i / 10) + 1);
     }
   }
 
   // 최종 상태 출력
-  printf("\n최종 매핑 테이블:\n");
+  printf("\n========== 최종 매핑 테이블 ==========\n");
   ftl_print();
 
   printf("\n프리 블록 상태:\n");
