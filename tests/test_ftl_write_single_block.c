@@ -8,6 +8,7 @@
 // 외부 함수 선언
 void ftl_open();
 void ftl_write(int lsn, char* sectorbuf);
+void ftl_read(int lsn, char* sectorbuf);
 void ftl_print();
 void ftl_print_free_blocks();
 
@@ -20,7 +21,7 @@ int fdd_write(int ppn, char* pagebuf);
 int fdd_erase(int pbn);
 
 int main() {
-  printf("===== FTL Write 테스트 시작 =====\n");
+  printf("===== FTL 단일 블록 내 여러 페이지에 쓰기 테스트 시작 =====\n");
 
   // 플래시 메모리 초기화
   char* blockbuf;
@@ -45,9 +46,10 @@ int main() {
 
   // 테스트용 섹터 버퍼 생성
   char sectorbuf[SECTOR_SIZE];
+  char readbuf[SECTOR_SIZE];  // 읽기용 버퍼 추가
 
-  // 다양한 LSN에 쓰기 테스트
-  printf("\n1. 단일 블록 내 여러 페이지에 쓰기 테스트\n");
+  // 단일 블록 내 여러 페이지에 쓰기 테스트
+  printf("\n단일 블록 내 여러 페이지에 쓰기 테스트\n");
   for (int i = 0; i < 3; i++) {
     // 버퍼 초기화 및 테스트 데이터 입력
     memset(sectorbuf, 'A' + i, SECTOR_SIZE);
@@ -55,49 +57,42 @@ int main() {
 
     printf("LSN %d에 데이터 쓰기: %s\n", i, sectorbuf);
     ftl_write(i, sectorbuf);
+
+    // PPN 상태 확인을 위한 코드
+    printf("\nLSN %d 쓰기 후 PPN 상태 확인:\n", i);
+    int lbn_i = i / PAGES_PER_BLOCK;
+
+    // 매핑 테이블 출력
+    printf("\nLSN %d 쓰기 후 매핑 테이블 출력:\n", i);
+    ftl_print();
+
+    // 프리 블록 리스트 출력
+    printf("\nLSN %d 쓰기 후 프리 블록 리스트 출력:\n", i);
+    ftl_print_free_blocks();
+
+    // 데이터 읽기 테스트
+    memset(readbuf, 0, SECTOR_SIZE);
+    ftl_read(i, readbuf);
+    printf("LSN %d에서 데이터 읽기: %s\n", i, readbuf);
+
+    // 쓰기와 읽기 결과 비교
+    if (strncmp(sectorbuf, readbuf, SECTOR_SIZE) != 0) {
+      printf("오류: LSN %d의 쓰기와 읽기 결과가 일치하지 않습니다!\n", i);
+    } else {
+      printf("LSN %d 쓰기/읽기 테스트 성공\n", i);
+    }
   }
 
   // 매핑 테이블과 프리 블록 리스트 출력
-  printf("\n첫 번째 쓰기 후 매핑 테이블 출력:\n");
+  printf("\n최종 매핑 테이블 출력:\n");
   ftl_print();
 
-  printf("\n첫 번째 쓰기 후 프리 블록 리스트 출력:\n");
-  ftl_print_free_blocks();
-
-  // 다른 블록에 쓰기 테스트
-  printf("\n2. 다른 블록에 쓰기 테스트\n");
-  int lsn = PAGES_PER_BLOCK + 1;  // 다른 논리 블록의 LSN
-  memset(sectorbuf, 'X', SECTOR_SIZE);
-  snprintf(sectorbuf, SECTOR_SIZE, "다른 블록 LSN %d 테스트", lsn);
-
-  printf("LSN %d에 데이터 쓰기: %s\n", lsn, sectorbuf);
-  ftl_write(lsn, sectorbuf);
-
-  // 매핑 테이블과 프리 블록 리스트 출력
-  printf("\n두 번째 쓰기 후 매핑 테이블 출력:\n");
-  ftl_print();
-
-  printf("\n두 번째 쓰기 후 프리 블록 리스트 출력:\n");
-  ftl_print_free_blocks();
-
-  // 덮어쓰기 테스트
-  printf("\n3. 기존 데이터 덮어쓰기 테스트\n");
-  memset(sectorbuf, 'Z', SECTOR_SIZE);
-  snprintf(sectorbuf, SECTOR_SIZE, "LSN 1 덮어쓰기 데이터");
-
-  printf("LSN 1에 데이터 덮어쓰기: %s\n", sectorbuf);
-  ftl_write(1, sectorbuf);
-
-  // 매핑 테이블과 프리 블록 리스트 출력
-  printf("\n덮어쓰기 후 매핑 테이블 출력:\n");
-  ftl_print();
-
-  printf("\n덮어쓰기 후 프리 블록 리스트 출력:\n");
+  printf("\n최종 프리 블록 리스트 출력:\n");
   ftl_print_free_blocks();
 
   // 플래시 메모리 파일 닫기
   fclose(flashmemoryfp);
 
-  printf("===== FTL Write 테스트 완료 =====\n");
+  printf("===== FTL 단일 블록 내 여러 페이지에 쓰기 테스트 완료 =====\n");
   return 0;
 }
