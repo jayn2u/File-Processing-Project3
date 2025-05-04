@@ -78,11 +78,20 @@ int get_free_block() {
   return pbn;
 }
 
-// 매핑 테이블에서 주어진 lbn에 해당하는 pbn 찾기
-int get_pbn(int lbn) {
+// 매핑 테이블에서 주어진 lsn에 해당하는 pbn 찾기
+int get_pbn(int lsn) {
+  if (lsn < 0 || lsn >= DATAPAGES_PER_DEVICE) {
+    return -1;  // 유효하지 않은 lsn
+  }
+
+  // lsn으로부터 논리 블록 번호(lbn) 계산
+  int lbn = lsn / PAGES_PER_BLOCK;
+
   if (lbn < 0 || lbn >= DATABLKS_PER_DEVICE) {
     return -1;  // 유효하지 않은 lbn
   }
+
+  // 매핑 테이블에서 pbn 찾기
   return mapping_table[lbn].pbn;
 }
 
@@ -136,7 +145,7 @@ void ftl_write(int lsn, char* sectorbuf) {
   char pagebuf[PAGE_SIZE];
 
   // 매핑 테이블에서 pbn 찾기
-  int pbn = get_pbn(lbn);
+  int pbn = get_pbn(lsn);
 
   // 해당 lbn에 대한 pbn이 아직 할당되지 않은 경우
   if (pbn == -1) {
@@ -313,7 +322,7 @@ void ftl_read(int lsn, char* sectorbuf) {
   char pagebuf[PAGE_SIZE];
 
   // 매핑 테이블에서 pbn 찾기
-  int pbn = get_pbn(lbn);
+  int pbn = get_pbn(lsn);
 
   // 해당 lbn에 대한 pbn이 아직 할당되지 않은 경우
   if (pbn == -1) {
