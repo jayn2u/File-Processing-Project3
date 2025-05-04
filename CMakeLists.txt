@@ -8,7 +8,6 @@ add_executable(File_Processing_Project3 main.c ftlmgr.c fdevicedriver.c)
 
 # 테스트 파일들을 위한 실행 파일 추가
 add_executable(test_ftl_open tests/test_ftl_open.c ftlmgr.c fdevicedriver.c)
-add_executable(test_ftl_read tests/test_ftl_read.c ftlmgr.c fdevicedriver.c)
 add_executable(test_ftl_write_single_block tests/test_ftl_write_single_block.c ftlmgr.c fdevicedriver.c)
 add_executable(test_ftl_write_different_blocks tests/test_ftl_write_different_blocks.c ftlmgr.c fdevicedriver.c)
 add_executable(test_ftl_write_overwrite tests/test_ftl_write_overwrite.c ftlmgr.c fdevicedriver.c)
