@@ -13,3 +13,4 @@ add_executable(test_ftl_write_different_blocks tests/test_ftl_write_different_bl
 add_executable(test_ftl_write_overwrite tests/test_ftl_write_overwrite.c ftlmgr.c fdevicedriver.c)
 add_executable(test_ftl_read_nonexistent tests/test_ftl_read_nonexistent.c ftlmgr.c fdevicedriver.c)
 add_executable(test_ftl_complex_scenario tests/test_ftl_complex_scenario.c ftlmgr.c fdevicedriver.c)
+add_executable(test_spare_area_lsn tests/test_spare_area_lsn.c ftlmgr.c fdevicedriver.c)
