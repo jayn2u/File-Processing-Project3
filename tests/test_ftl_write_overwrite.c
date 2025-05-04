@@ -21,7 +21,7 @@ int fdd_write(int ppn, char* pagebuf);
 int fdd_erase(int pbn);
 
 int main() {
-  printf("===== FTL 기존 데이터 덮어쓰기 테스트 시작 =====\n");
+  printf("===== FTL 동일한 LSN에 6번 업데이트 테스트 시작 =====\n");
 
   // 플래시 메모리 초기화
   char* blockbuf;
@@ -44,62 +44,54 @@ int main() {
   // FTL 초기화
   ftl_open();
 
-  // 테스트용 섹터 버퍼 생성
+  // 테스트용 버퍼 생성
   char sectorbuf[SECTOR_SIZE];
-  char readbuf[SECTOR_SIZE];  // 읽기용 버퍼 추가
+  char readbuf[SECTOR_SIZE];  // 읽기용 버퍼
+  int test_lsn = 1;           // 테스트에 사용할 LSN
 
-  // 초기 데이터 쓰기
-  printf("\n1. 초기 데이터 쓰기\n");
-  int test_lsn = 1;
-  memset(sectorbuf, 'A', SECTOR_SIZE);
-  snprintf(sectorbuf, SECTOR_SIZE, "LSN %d 초기 데이터", test_lsn);
-
-  printf("LSN %d에 초기 데이터 쓰기: %s\n", test_lsn, sectorbuf);
-  ftl_write(test_lsn, sectorbuf);
-
-  // 매핑 테이블 출력
-  printf("\n초기 데이터 쓰기 후 매핑 테이블 출력:\n");
+  printf("\n초기 매핑 테이블 출력:\n");
   ftl_print();
 
-  printf("\n초기 데이터 쓰기 후 프리 블록 리스트 출력:\n");
+  printf("\n초기 프리 블록 리스트 출력:\n");
   ftl_print_free_blocks();
 
-  // 초기 데이터 읽기 테스트
-  memset(readbuf, 0, SECTOR_SIZE);
-  ftl_read(test_lsn, readbuf);
-  printf("LSN %d에서 초기 데이터 읽기: %s\n", test_lsn, readbuf);
+  printf("\n1. 동일한 LSN에 6번 업데이트 테스트\n");
 
-  // 덮어쓰기 테스트
-  printf("\n2. 기존 데이터 덮어쓰기 테스트\n");
-  memset(sectorbuf, 'Z', SECTOR_SIZE);
-  snprintf(sectorbuf, SECTOR_SIZE, "LSN %d 덮어쓰기 데이터", test_lsn);
+  // 동일한 LSN에 6번 업데이트 수행
+  for (int i = 0; i < PAGES_PER_BLOCK + 2; i++) {
+    memset(sectorbuf, 'A' + i,
+           SECTOR_SIZE);  // 각 업데이트마다 다른 문자로 채움
+    snprintf(sectorbuf, SECTOR_SIZE, "LSN %d 업데이트 #%d", test_lsn, i);
 
-  printf("LSN %d에 데이터 덮어쓰기: %s\n", test_lsn, sectorbuf);
-  ftl_write(test_lsn, sectorbuf);
+    printf("\n[업데이트 #%d] LSN %d에 데이터 쓰기: %s\n", i, test_lsn,
+           sectorbuf);
+    ftl_write(test_lsn, sectorbuf);
 
-  // 매핑 테이블 출력
-  printf("\n덮어쓰기 후 매핑 테이블 출력:\n");
-  ftl_print();
+    // 매핑 테이블 및 프리 블록 상태 출력
+    printf("매핑 테이블 출력 (업데이트 #%d 후):\n", i);
+    ftl_print();
 
-  printf("\n덮어쓰기 후 프리 블록 리스트 출력:\n");
-  ftl_print_free_blocks();
+    printf("\n프리 블록 리스트 출력 (업데이트 #%d 후):\n", i);
+    ftl_print_free_blocks();
 
-  // 덮어쓰기 데이터 읽기 테스트
-  memset(readbuf, 0, SECTOR_SIZE);
-  ftl_read(test_lsn, readbuf);
-  printf("덮어쓰기 후 LSN %d에서 데이터 읽기: %s\n", test_lsn, readbuf);
+    // 데이터 읽기 및 검증
+    memset(readbuf, 0, SECTOR_SIZE);
+    ftl_read(test_lsn, readbuf);
+    printf("LSN %d에서 데이터 읽기: %s\n", test_lsn, readbuf);
 
-  // 쓰기와 읽기 결과 비교
-  if (strncmp(sectorbuf, readbuf, SECTOR_SIZE) != 0) {
-    printf("오류: 덮어쓰기 후 LSN %d의 쓰기와 읽기 결과가 일치하지 않습니다!\n",
-           test_lsn);
-  } else {
-    printf("LSN %d 덮어쓰기/읽기 테스트 성공\n", test_lsn);
+    if (strncmp(sectorbuf, readbuf, SECTOR_SIZE) != 0) {
+      printf(
+          "오류: 업데이트 #%d 후 LSN %d의 쓰기와 읽기 결과가 일치하지 "
+          "않습니다!\n",
+          i, test_lsn);
+    } else {
+      printf("업데이트 #%d 후 LSN %d 읽기 검증 성공\n", i, test_lsn);
+    }
   }
 
   // 플래시 메모리 파일 닫기
   fclose(flashmemoryfp);
 
-  printf("===== FTL 기존 데이터 덮어쓰기 테스트 완료 =====\n");
+  printf("\n===== FTL 동일한 LSN에 6번 업데이트 테스트 완료 =====\n");
   return 0;
 }
