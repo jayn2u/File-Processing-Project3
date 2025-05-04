@@ -128,6 +128,80 @@ void ftl_open() {
   ftl_initialized = 1;
 }
 
+// 페이지 버퍼에 데이터와 LSN 정보를 채우는 함수
+void prepare_page_buffer(char* pagebuf, char* sectorbuf, int lsn) {
+  // 페이지 버퍼 초기화 (0xFF로)
+  memset(pagebuf, 0xFF, PAGE_SIZE);
+  // 섹터 데이터 복사
+  memcpy(pagebuf, sectorbuf, SECTOR_SIZE);
+  // Spare 영역에 LSN 정보 저장 (바이너리 형태로)
+  memcpy(pagebuf + SECTOR_SIZE, &lsn, sizeof(int));
+}
+
+// 특정 LSN이 블록 내에 있는지 확인하고 위치를 반환
+int find_lsn_in_block(MappingEntry* entry, int lsn) {
+  for (int i = 0; i <= entry->last_offset; i++) {
+    if (entry->page_lsns[i] == lsn) {
+      return i;  // LSN이 있는 위치 반환
+    }
+  }
+  return -1;  // 찾지 못함
+}
+
+// 새 물리 블록을 할당하고 매핑 테이블 초기화
+int allocate_new_block(int lbn) {
+  int pbn = get_free_block();
+  if (pbn == -1) {
+    printf("Error: No free blocks available\n");
+    return -1;
+  }
+
+  // 매핑 테이블 업데이트
+  mapping_table[lbn].pbn = pbn;
+  mapping_table[lbn].last_offset = -1;  // 새 블록이므로 last_offset 초기화
+
+  // 페이지 LSN 초기화
+  for (int i = 0; i < PAGES_PER_BLOCK; i++) {
+    mapping_table[lbn].page_lsns[i] = -1;
+  }
+
+  return pbn;
+}
+
+// 유효한 페이지 데이터를 새 블록으로 복사 (특정 페이지 제외 가능)
+int copy_valid_pages(int old_pbn, int new_pbn, int lbn, int exclude_offset) {
+  int new_offset = 0;
+
+  for (int i = 0; i <= mapping_table[lbn].last_offset; i++) {
+    // 제외할 페이지이거나 유효하지 않은 페이지인 경우 건너뜀
+    if (i == exclude_offset || mapping_table[lbn].page_lsns[i] == -1) {
+      continue;
+    }
+
+    char old_pagebuf[PAGE_SIZE];
+    int old_ppn = old_pbn * PAGES_PER_BLOCK + i;
+
+    // 기존 데이터 읽기
+    if (fdd_read(old_ppn, old_pagebuf) < 0) {
+      printf("Error: Read operation failed for PPN: %d\n", old_ppn);
+      return -1;
+    }
+
+    // 새 블록에 순차적으로 쓰기
+    int new_ppn = new_pbn * PAGES_PER_BLOCK + new_offset;
+    if (fdd_write(new_ppn, old_pagebuf) < 0) {
+      printf("Error: Write operation failed for PPN: %d\n", new_ppn);
+      return -1;
+    }
+
+    // 새 블록의 페이지 LSN 정보 업데이트
+    mapping_table[lbn].page_lsns[new_offset] = mapping_table[lbn].page_lsns[i];
+    new_offset++;
+  }
+
+  return new_offset;
+}
+
 // 데이터 쓰기 함수
 void ftl_write(int lsn, char* sectorbuf) {
   // 초기화 상태 확인
@@ -136,8 +210,9 @@ void ftl_write(int lsn, char* sectorbuf) {
     return;
   }
 
+  // LSN 유효성 검사
   if (lsn < 0 || lsn >= DATAPAGES_PER_DEVICE) {
-    printf("Invalid LSN: %d\n", lsn);
+    printf("Error: Invalid LSN: %d\n", lsn);
     return;
   }
 
@@ -149,91 +224,45 @@ void ftl_write(int lsn, char* sectorbuf) {
 
   // 해당 lbn에 대한 pbn이 아직 할당되지 않은 경우
   if (pbn == -1) {
-    // 새 물리 블록 할당
-    pbn = get_free_block();
-    if (pbn == -1) {
-      printf("No free blocks available\n");
-      return;
-    }
-
-    // 매핑 테이블 업데이트
-    mapping_table[lbn].pbn = pbn;
-    mapping_table[lbn].last_offset = -1;  // 새 블록이므로 last_offset 초기화
-
-    // 페이지 LSN 초기화
-    for (int i = 0; i < PAGES_PER_BLOCK; i++) {
-      mapping_table[lbn].page_lsns[i] = -1;
-    }
+    pbn = allocate_new_block(lbn);
+    if (pbn == -1) return;  // 블록 할당 실패
   }
 
-  // 페이지 버퍼 준비 (0xFF로 초기화)
-  memset(pagebuf, 0xFF, PAGE_SIZE);
-  // 섹터 데이터 복사
-  memcpy(pagebuf, sectorbuf, SECTOR_SIZE);
-  // Spare 영역에 LSN 정보 저장 (바이너리 형태로)
-  memcpy(pagebuf + SECTOR_SIZE, &lsn, sizeof(int));
+  // 페이지 버퍼 준비
+  prepare_page_buffer(pagebuf, sectorbuf, lsn);
 
-  // 기존 데이터 업데이트 여부 확인
-  int update_position = -1;
-  for (int i = 0; i <= mapping_table[lbn].last_offset; i++) {
-    if (mapping_table[lbn].page_lsns[i] == lsn) {
-      update_position = i;
-      break;
-    }
-  }
+  // 블록 내에 동일 LSN이 있는지 확인 (업데이트인 경우)
+  int update_position = find_lsn_in_block(&mapping_table[lbn], lsn);
 
-  // 기존 데이터가 있는 경우 (동일 LSN에 대한 업데이트)
+  // 기존 데이터 업데이트인 경우
   if (update_position != -1) {
-    // 블록 내의 다른 페이지를 새 블록으로 복사
+    // 새 블록 할당
     int new_pbn = get_free_block();
     if (new_pbn == -1) {
-      printf("No free blocks available\n");
+      printf("Error: No free blocks available\n");
       return;
     }
 
-    // 기존 블록에서 유효한 페이지 데이터 복사 (업데이트 페이지 제외)
-    int new_offset = 0;
-    for (int i = 0; i <= mapping_table[lbn].last_offset; i++) {
-      if (i != update_position && mapping_table[lbn].page_lsns[i] != -1) {
-        char old_pagebuf[PAGE_SIZE];
-        int old_ppn = pbn * PAGES_PER_BLOCK + i;
+    // 유효한 페이지 복사 (업데이트 대상 제외)
+    int new_offset = copy_valid_pages(pbn, new_pbn, lbn, update_position);
+    if (new_offset == -1) return;  // 복사 실패
 
-        // 기존 데이터 읽기
-        if (fdd_read(old_ppn, old_pagebuf) < 0) {
-          printf("Read operation failed for PPN: %d\n", old_ppn);
-          return;
-        }
-
-        // 새 블록에 순차적으로 쓰기
-        int new_ppn = new_pbn * PAGES_PER_BLOCK + new_offset;
-        if (fdd_write(new_ppn, old_pagebuf) < 0) {
-          printf("Write operation failed for PPN: %d\n", new_ppn);
-          return;
-        }
-
-        // 새 블록의 페이지 LSN 정보 업데이트
-        mapping_table[lbn].page_lsns[new_offset] =
-            mapping_table[lbn].page_lsns[i];
-        new_offset++;
-      }
-    }
-
-    // 새로운 데이터를 새 블록의 다음 위치에 쓰기
+    // 새로운 데이터 쓰기
     int new_ppn = new_pbn * PAGES_PER_BLOCK + new_offset;
     if (fdd_write(new_ppn, pagebuf) < 0) {
-      printf("Write operation failed for PPN: %d\n", new_ppn);
+      printf("Error: Write operation failed for PPN: %d\n", new_ppn);
       return;
     }
 
     // 매핑 테이블 업데이트
     mapping_table[lbn].page_lsns[new_offset] = lsn;
-    mapping_table[lbn].pbn = new_pbn;
     mapping_table[lbn].last_offset = new_offset;
+    mapping_table[lbn].pbn = new_pbn;
 
     // 기존 블록 삭제 후 프리 리스트에 추가
     fdd_erase(pbn);
     add_free_block(pbn);
-  } else {
+  } else {  // 새로운 데이터 쓰기
     // 블록 내 다음 가용 위치 찾기
     int next_offset = mapping_table[lbn].last_offset + 1;
 
@@ -243,7 +272,7 @@ void ftl_write(int lsn, char* sectorbuf) {
 
       // 데이터 쓰기
       if (fdd_write(ppn, pagebuf) < 0) {
-        printf("Write operation failed for PPN: %d\n", ppn);
+        printf("Error: Write operation failed for PPN: %d\n", ppn);
         return;
       }
 
@@ -251,45 +280,22 @@ void ftl_write(int lsn, char* sectorbuf) {
       mapping_table[lbn].page_lsns[next_offset] = lsn;
       mapping_table[lbn].last_offset = next_offset;
     } else {
-      // 블록이 꽉 찬 경우, 새 블록으로 교체하고 데이터 복사
+      // 블록이 꽉 찬 경우, 새 블록으로 교체
       int new_pbn = get_free_block();
       if (new_pbn == -1) {
-        printf("No free blocks available\n");
+        printf("Error: No free blocks available\n");
         return;
       }
 
-      // 기존 블록에서 유효한 페이지 데이터 복사
-      int new_offset = 0;
-      for (int i = 0; i < PAGES_PER_BLOCK; i++) {
-        int current_lsn = mapping_table[lbn].page_lsns[i];
+      // 유효한 페이지 복사
+      int new_offset =
+          copy_valid_pages(pbn, new_pbn, lbn, -1);  // 제외 페이지 없음
+      if (new_offset == -1) return;                 // 복사 실패
 
-        if (current_lsn != -1) {
-          char old_pagebuf[PAGE_SIZE];
-          int old_ppn = pbn * PAGES_PER_BLOCK + i;
-
-          // 기존 데이터 읽기
-          if (fdd_read(old_ppn, old_pagebuf) < 0) {
-            printf("Read operation failed for PPN: %d\n", old_ppn);
-            return;
-          }
-
-          // 새 블록에 순차적으로 쓰기
-          int new_ppn = new_pbn * PAGES_PER_BLOCK + new_offset;
-          if (fdd_write(new_ppn, old_pagebuf) < 0) {
-            printf("Write operation failed for PPN: %d\n", new_ppn);
-            return;
-          }
-
-          // 새 블록의 페이지 LSN 정보 업데이트
-          mapping_table[lbn].page_lsns[new_offset] = current_lsn;
-          new_offset++;
-        }
-      }
-
-      // 새로운 데이터를 새 블록의 다음 위치에 쓰기
+      // 새로운 데이터 쓰기
       int new_ppn = new_pbn * PAGES_PER_BLOCK + new_offset;
       if (fdd_write(new_ppn, pagebuf) < 0) {
-        printf("Write operation failed for PPN: %d\n", new_ppn);
+        printf("Error: Write operation failed for PPN: %d\n", new_ppn);
         return;
       }
 
